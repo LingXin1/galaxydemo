@@ -4,6 +4,9 @@ import * as THREE from "three";
 import { OrbitControls } from "three/addons/controls/OrbitControls.js";
 import GUI from "lil-gui";
 
+import vertexShader from "./glsl/vertexShader.glsl";
+import fragmentShader from "./glsl/fragmentShader.glsl";
+
 let scene, camera, renderer, controls, galaxy, gui;
 const canvas = ref(null);
 
@@ -26,12 +29,12 @@ camera.lookAt(0, 0, 0);
 
 // todo 星系参数
 const parameters = {
-  num: 1000,
+  num: 15000,
   size: 0.1,
   radius: 10,
   branch: 3,
-  spin: 0.5,
-  randomness: 0.2,
+  spin: 0.8,
+  randomness: 1.5,
   randomnessPower: 5,
   insidecolor: "#ff6030",
   outsidecolor: "#1b3984",
@@ -41,15 +44,21 @@ const parameters = {
 const initgalaxy = () => {
   const positionarr = [];
   const colorarr = [];
+  const scalearr = [];
   const insidecolor = new THREE.Color(parameters.insidecolor);
   const outsidecolor = new THREE.Color(parameters.outsidecolor);
 
   const galaxygeometry = new THREE.BufferGeometry();
-  const galaxymaterial = new THREE.PointsMaterial({
-    size: parameters.size,
+  const galaxymaterial = new THREE.ShaderMaterial({
     depthWrite: false,
-    sizeAttenuation: true,
+    blending: THREE.AdditiveBlending,
     vertexColors: true,
+    vertexShader,
+    fragmentShader,
+    uniforms: {
+      vsize: { value: 5 * renderer.getPixelRatio() },
+      vtime: { value: 0 },
+    },
   });
 
   for (let i = 0; i < parameters.num; i++) {
@@ -69,9 +78,11 @@ const initgalaxy = () => {
       Math.pow(Math.random(), parameters.randomnessPower) *
       (Math.random() < 0.5 ? 1 : -1);
 
-    positionarr[index] = radius * Math.sin(angle + spinAngel) + randomx;
+    positionarr[index] = radius * Math.sin(angle) + randomx;
     positionarr[index + 1] = randomy;
-    positionarr[index + 2] = radius * Math.cos(angle + spinAngel) + randomz;
+    positionarr[index + 2] = radius * Math.cos(angle) + randomz;
+
+    scalearr[i] = Math.random();
 
     const newcolor = insidecolor.clone();
     newcolor.lerp(outsidecolor, radius / parameters.radius);
@@ -88,11 +99,15 @@ const initgalaxy = () => {
     "color",
     new THREE.Float32BufferAttribute(colorarr, 3)
   );
+  galaxygeometry.setAttribute(
+    "vscale",
+    new THREE.Float32BufferAttribute(scalearr, 1)
+  );
   galaxy = new THREE.Points(galaxygeometry, galaxymaterial);
+  console.log(galaxy);
+
   scene.add(galaxy);
 };
-
-initgalaxy();
 
 // todo Gui
 gui
@@ -186,6 +201,7 @@ const clock = new THREE.Clock();
 const tick = () => {
   const elapsed = clock.getElapsedTime();
   requestAnimationFrame(tick);
+  galaxy.material.uniforms.vtime.value = elapsed;
 
   renderer.render(scene, camera);
   controls.update();
@@ -200,6 +216,7 @@ onMounted(() => {
   renderer.setSize(window.innerWidth, window.innerHeight);
   renderer.render(scene, camera);
 
+  initgalaxy();
   // todo 执行动画
   tick();
 });
